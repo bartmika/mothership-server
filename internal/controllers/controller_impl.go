@@ -93,7 +93,7 @@ func (s *Controller) Register(ctx context.Context, in *pb.RegistrationReq) (*pb.
 	log.Println("TSDB ready for tenant id #", t.Id)
 
 	return &pb.RegistrationRes{
-		Message: "You have been succcessfully registered. Please login to begin using the system.",
+		Message: "You have been successfully registered. Please login to begin using the system.",
 	}, nil
 }
 
