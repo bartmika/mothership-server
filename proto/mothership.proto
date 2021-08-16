@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+option go_package = "github.com/bartmika/mothership-server";
+
+package proto;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+
+service Mothership {
+    rpc Register(RegistrationReq) returns (RegistrationRes) {}
+
+    rpc Login(LoginReq) returns (LoginRes) {}
+
+    rpc InsertTimeSeriesDatum (TimeSeriesDatumReq) returns (google.protobuf.Empty) {}
+
+    rpc InsertTimeSeriesData (TimeSeriesDataListReq) returns (google.protobuf.Empty) {}
+
+    rpc SelectTimeSeriesData (FilterReq) returns (SelectRes) {}
+}
+
+message RegistrationReq {
+    string email = 1;
+    string password = 2;
+    string firstName = 3;
+    string lastName = 4;
+    string company = 5;
+    string timezone = 6;
+}
+
+message RegistrationRes {
+    string message = 1;
+}
+
+message LoginReq {
+    string email = 1;
+    string password = 2;
+}
+
+message LoginRes {
+    string accessToken = 1;
+    string refreshToken = 2;
+}
+
+message DataPointRes {
+    double value = 3;
+    google.protobuf.Timestamp timestamp = 4;
+}
+
+message Label {
+    string name = 1;
+    string value = 2;
+}
+
+message TimeSeriesDataListReq {
+    repeated TimeSeriesDatumReq data = 1;
+}
+
+message TimeSeriesDatumReq {
+    string metric = 1;
+    repeated Label labels = 2;
+    double value = 3;
+    google.protobuf.Timestamp timestamp = 4;
+}
+
+message FilterReq {
+    string metric = 1;
+    repeated Label labels = 2;
+    google.protobuf.Timestamp start = 3;
+    google.protobuf.Timestamp end = 4;
+}
+
+message SelectRes {
+    repeated DataPointRes dataPoints = 1;
+}

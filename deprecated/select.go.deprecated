@@ -1,0 +1,120 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log"
+	"time"
+
+	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	// "google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
+
+	pb "github.com/bartmika/mothership-server/proto"
+)
+
+// Run:
+// go run main.go select --port=50051 --metric="solar_biodigester_temperature_in_degrees" --start=1600000000 --end=1725946120
+
+var (
+	start int64
+	end   int64
+)
+
+func init() {
+	// The following are required.
+	selectCmd.Flags().StringVarP(&metric, "metric", "m", "", "The metric to filter by")
+	selectCmd.MarkFlagRequired("metric")
+	selectCmd.Flags().Int64VarP(&start, "start", "s", 0, "The start timestamp to begin our range")
+	selectCmd.MarkFlagRequired("start")
+	selectCmd.Flags().Int64VarP(&end, "end", "e", 0, "The end timestamp to finish our range")
+	selectCmd.MarkFlagRequired("end")
+	selectCmd.Flags().StringVarP(&iAccessToken, "access_token", "a", "", "The JWT access token provided with successful authentication")
+	selectCmd.MarkFlagRequired("access_token")
+	selectCmd.Flags().StringVarP(&iRefreshToken, "refresh_token", "b", "", "The JWT refresh token provided with successful authentication")
+	selectCmd.MarkFlagRequired("refresh_token")
+
+	// The following are optional and will have defaults placed when missing.
+	selectCmd.Flags().IntVarP(&port, "port", "p", 50051, "The port of our server.")
+	rootCmd.AddCommand(selectCmd)
+}
+
+func doSelectRow() {
+	// Here is the code which attaches our authorization information to our
+	// context and has the context sent to the server with these credentials.
+	// Use this context ONLY when making RPC calls.
+	//
+	// Special Thanks:
+	// https://shijuvar.medium.com/writing-grpc-interceptors-in-go-bf3e7671fe48
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", iAccessToken)
+
+
+	// Set up a direct connection to the gRPC server.
+	conn, err := grpc.Dial(
+		fmt.Sprintf(":%v", port),
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+
+	// Set up our protocol buffer interface.
+	client := pb.NewMothershipClient(conn)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, 30 * time.Second)
+	defer cancel()
+
+	// Convert the unix timestamp into the protocal buffers timestamp format.
+	sts := &tspb.Timestamp{
+		Seconds: start,
+		Nanos:   0,
+	}
+	ets := &tspb.Timestamp{
+		Seconds: end,
+		Nanos:   0,
+	}
+
+	// Generate our labels.
+	labels := []*pb.Label{}
+	labels = append(labels, &pb.Label{Name: "Source", Value: "Command"})
+
+	// Perform our gRPC request.
+	stream, err := client.Select(ctx, &pb.FilterReq{
+		Labels: labels,
+		Metric: metric,
+		Start: sts,
+		End: ets,
+	})
+
+	if err != nil {
+		log.Fatalf("could not select: %v", err)
+	}
+
+	// Handle our stream of data from the server.
+	for {
+		dataPoint, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error with stream: %v", err)
+		}
+
+		// Print out the gRPC response.
+		log.Printf("Server Response: %s", dataPoint)
+	}
+}
+
+var selectCmd = &cobra.Command{
+	Use:   "select",
+	Short: "List data",
+	Long:  `Connect to the gRPC server and return list of results based on a selection filter.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		doSelectRow()
+	},
+}
