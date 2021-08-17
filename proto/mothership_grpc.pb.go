@@ -21,9 +21,11 @@ const _ = grpc.SupportPackageIsVersion7
 type MothershipClient interface {
 	Register(ctx context.Context, in *RegistrationReq, opts ...grpc.CallOption) (*RegistrationRes, error)
 	Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginRes, error)
+	RefreshToken(ctx context.Context, in *RefreshTokenReq, opts ...grpc.CallOption) (*RefreshTokenRes, error)
 	InsertTimeSeriesDatum(ctx context.Context, in *TimeSeriesDatumReq, opts ...grpc.CallOption) (*empty.Empty, error)
-	InsertTimeSeriesData(ctx context.Context, in *TimeSeriesDataListReq, opts ...grpc.CallOption) (*empty.Empty, error)
-	SelectTimeSeriesData(ctx context.Context, in *FilterReq, opts ...grpc.CallOption) (*SelectRes, error)
+	InsertTimeSeriesData(ctx context.Context, opts ...grpc.CallOption) (Mothership_InsertTimeSeriesDataClient, error)
+	InsertBulkTimeSeriesData(ctx context.Context, in *BulkTimeSeriesDataReq, opts ...grpc.CallOption) (*empty.Empty, error)
+	SelectBulkTimeSeriesData(ctx context.Context, in *FilterReq, opts ...grpc.CallOption) (*SelectBulkRes, error)
 }
 
 type mothershipClient struct {
@@ -52,6 +54,15 @@ func (c *mothershipClient) Login(ctx context.Context, in *LoginReq, opts ...grpc
 	return out, nil
 }
 
+func (c *mothershipClient) RefreshToken(ctx context.Context, in *RefreshTokenReq, opts ...grpc.CallOption) (*RefreshTokenRes, error) {
+	out := new(RefreshTokenRes)
+	err := c.cc.Invoke(ctx, "/proto.Mothership/RefreshToken", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mothershipClient) InsertTimeSeriesDatum(ctx context.Context, in *TimeSeriesDatumReq, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/proto.Mothership/InsertTimeSeriesDatum", in, out, opts...)
@@ -61,18 +72,52 @@ func (c *mothershipClient) InsertTimeSeriesDatum(ctx context.Context, in *TimeSe
 	return out, nil
 }
 
-func (c *mothershipClient) InsertTimeSeriesData(ctx context.Context, in *TimeSeriesDataListReq, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *mothershipClient) InsertTimeSeriesData(ctx context.Context, opts ...grpc.CallOption) (Mothership_InsertTimeSeriesDataClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Mothership_ServiceDesc.Streams[0], "/proto.Mothership/InsertTimeSeriesData", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &mothershipInsertTimeSeriesDataClient{stream}
+	return x, nil
+}
+
+type Mothership_InsertTimeSeriesDataClient interface {
+	Send(*TimeSeriesDatumReq) error
+	CloseAndRecv() (*empty.Empty, error)
+	grpc.ClientStream
+}
+
+type mothershipInsertTimeSeriesDataClient struct {
+	grpc.ClientStream
+}
+
+func (x *mothershipInsertTimeSeriesDataClient) Send(m *TimeSeriesDatumReq) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *mothershipInsertTimeSeriesDataClient) CloseAndRecv() (*empty.Empty, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(empty.Empty)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *mothershipClient) InsertBulkTimeSeriesData(ctx context.Context, in *BulkTimeSeriesDataReq, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/proto.Mothership/InsertTimeSeriesData", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.Mothership/InsertBulkTimeSeriesData", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *mothershipClient) SelectTimeSeriesData(ctx context.Context, in *FilterReq, opts ...grpc.CallOption) (*SelectRes, error) {
-	out := new(SelectRes)
-	err := c.cc.Invoke(ctx, "/proto.Mothership/SelectTimeSeriesData", in, out, opts...)
+func (c *mothershipClient) SelectBulkTimeSeriesData(ctx context.Context, in *FilterReq, opts ...grpc.CallOption) (*SelectBulkRes, error) {
+	out := new(SelectBulkRes)
+	err := c.cc.Invoke(ctx, "/proto.Mothership/SelectBulkTimeSeriesData", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +130,11 @@ func (c *mothershipClient) SelectTimeSeriesData(ctx context.Context, in *FilterR
 type MothershipServer interface {
 	Register(context.Context, *RegistrationReq) (*RegistrationRes, error)
 	Login(context.Context, *LoginReq) (*LoginRes, error)
+	RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenRes, error)
 	InsertTimeSeriesDatum(context.Context, *TimeSeriesDatumReq) (*empty.Empty, error)
-	InsertTimeSeriesData(context.Context, *TimeSeriesDataListReq) (*empty.Empty, error)
-	SelectTimeSeriesData(context.Context, *FilterReq) (*SelectRes, error)
+	InsertTimeSeriesData(Mothership_InsertTimeSeriesDataServer) error
+	InsertBulkTimeSeriesData(context.Context, *BulkTimeSeriesDataReq) (*empty.Empty, error)
+	SelectBulkTimeSeriesData(context.Context, *FilterReq) (*SelectBulkRes, error)
 	mustEmbedUnimplementedMothershipServer()
 }
 
@@ -101,14 +148,20 @@ func (UnimplementedMothershipServer) Register(context.Context, *RegistrationReq)
 func (UnimplementedMothershipServer) Login(context.Context, *LoginReq) (*LoginRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Login not implemented")
 }
+func (UnimplementedMothershipServer) RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RefreshToken not implemented")
+}
 func (UnimplementedMothershipServer) InsertTimeSeriesDatum(context.Context, *TimeSeriesDatumReq) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InsertTimeSeriesDatum not implemented")
 }
-func (UnimplementedMothershipServer) InsertTimeSeriesData(context.Context, *TimeSeriesDataListReq) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method InsertTimeSeriesData not implemented")
+func (UnimplementedMothershipServer) InsertTimeSeriesData(Mothership_InsertTimeSeriesDataServer) error {
+	return status.Errorf(codes.Unimplemented, "method InsertTimeSeriesData not implemented")
 }
-func (UnimplementedMothershipServer) SelectTimeSeriesData(context.Context, *FilterReq) (*SelectRes, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SelectTimeSeriesData not implemented")
+func (UnimplementedMothershipServer) InsertBulkTimeSeriesData(context.Context, *BulkTimeSeriesDataReq) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InsertBulkTimeSeriesData not implemented")
+}
+func (UnimplementedMothershipServer) SelectBulkTimeSeriesData(context.Context, *FilterReq) (*SelectBulkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SelectBulkTimeSeriesData not implemented")
 }
 func (UnimplementedMothershipServer) mustEmbedUnimplementedMothershipServer() {}
 
@@ -159,6 +212,24 @@ func _Mothership_Login_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Mothership_RefreshToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshTokenReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MothershipServer).RefreshToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.Mothership/RefreshToken",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MothershipServer).RefreshToken(ctx, req.(*RefreshTokenReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Mothership_InsertTimeSeriesDatum_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(TimeSeriesDatumReq)
 	if err := dec(in); err != nil {
@@ -177,38 +248,64 @@ func _Mothership_InsertTimeSeriesDatum_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Mothership_InsertTimeSeriesData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TimeSeriesDataListReq)
+func _Mothership_InsertTimeSeriesData_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MothershipServer).InsertTimeSeriesData(&mothershipInsertTimeSeriesDataServer{stream})
+}
+
+type Mothership_InsertTimeSeriesDataServer interface {
+	SendAndClose(*empty.Empty) error
+	Recv() (*TimeSeriesDatumReq, error)
+	grpc.ServerStream
+}
+
+type mothershipInsertTimeSeriesDataServer struct {
+	grpc.ServerStream
+}
+
+func (x *mothershipInsertTimeSeriesDataServer) SendAndClose(m *empty.Empty) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *mothershipInsertTimeSeriesDataServer) Recv() (*TimeSeriesDatumReq, error) {
+	m := new(TimeSeriesDatumReq)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _Mothership_InsertBulkTimeSeriesData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkTimeSeriesDataReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MothershipServer).InsertTimeSeriesData(ctx, in)
+		return srv.(MothershipServer).InsertBulkTimeSeriesData(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.Mothership/InsertTimeSeriesData",
+		FullMethod: "/proto.Mothership/InsertBulkTimeSeriesData",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MothershipServer).InsertTimeSeriesData(ctx, req.(*TimeSeriesDataListReq))
+		return srv.(MothershipServer).InsertBulkTimeSeriesData(ctx, req.(*BulkTimeSeriesDataReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Mothership_SelectTimeSeriesData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Mothership_SelectBulkTimeSeriesData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FilterReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MothershipServer).SelectTimeSeriesData(ctx, in)
+		return srv.(MothershipServer).SelectBulkTimeSeriesData(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.Mothership/SelectTimeSeriesData",
+		FullMethod: "/proto.Mothership/SelectBulkTimeSeriesData",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MothershipServer).SelectTimeSeriesData(ctx, req.(*FilterReq))
+		return srv.(MothershipServer).SelectBulkTimeSeriesData(ctx, req.(*FilterReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -229,18 +326,28 @@ var Mothership_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Mothership_Login_Handler,
 		},
 		{
+			MethodName: "RefreshToken",
+			Handler:    _Mothership_RefreshToken_Handler,
+		},
+		{
 			MethodName: "InsertTimeSeriesDatum",
 			Handler:    _Mothership_InsertTimeSeriesDatum_Handler,
 		},
 		{
-			MethodName: "InsertTimeSeriesData",
-			Handler:    _Mothership_InsertTimeSeriesData_Handler,
+			MethodName: "InsertBulkTimeSeriesData",
+			Handler:    _Mothership_InsertBulkTimeSeriesData_Handler,
 		},
 		{
-			MethodName: "SelectTimeSeriesData",
-			Handler:    _Mothership_SelectTimeSeriesData_Handler,
+			MethodName: "SelectBulkTimeSeriesData",
+			Handler:    _Mothership_SelectBulkTimeSeriesData_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "InsertTimeSeriesData",
+			Handler:       _Mothership_InsertTimeSeriesData_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "proto/mothership.proto",
 }

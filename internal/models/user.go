@@ -6,10 +6,11 @@ import (
 )
 
 var (
-	UserAdminRoleId   int8 = 1
-	UserPlainRoleId   int8 = 2
-	UserActiveState   int8 = 1
-	UserInactiveState int8 = 0
+	UserRootRoleId        int8 = 1
+	UserTenantAdminRoleId int8 = 2
+	UserTenantPlainRoleId int8 = 3
+	UserActiveState       int8 = 1
+	UserInactiveState     int8 = 0
 )
 
 type User struct {

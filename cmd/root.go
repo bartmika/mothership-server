@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	ipAddress   string
 	port        int
 	databaseUrl string
 	hmacSecret  string

@@ -35,8 +35,9 @@ func (s *Controller) serverInterceptor(ctx context.Context,
 
 	// Skip authorization for the following RPC paths
 	ignoreMethods := map[string]bool{
-		"/proto.Mothership/Login":    true,
-		"/proto.Mothership/Register": true,
+		"/proto.Mothership/Login":        true,
+		"/proto.Mothership/Register":     true,
+		"/proto.Mothership/RefreshToken": true,
 	}
 
 	// Perform our skip on authorization now.

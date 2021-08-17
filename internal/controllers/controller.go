@@ -20,6 +20,7 @@ import (
 )
 
 type Controller struct {
+	ipAddress   string
 	port        int
 	databaseUrl string
 	hmacSecret  string
@@ -32,7 +33,7 @@ type Controller struct {
 	pb.MothershipServer
 }
 
-func New(port int, databaseUrl string, hmacSecret string) *Controller {
+func New(ipAddress string, port int, databaseUrl string, hmacSecret string) *Controller {
 	dbpool, err := pgxpool.Connect(context.Background(), databaseUrl)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
@@ -43,6 +44,7 @@ func New(port int, databaseUrl string, hmacSecret string) *Controller {
 	userRepo := repositories.NewUserRepo(dbpool)
 
 	return &Controller{
+		ipAddress:   ipAddress,
 		port:        port,
 		databaseUrl: databaseUrl,
 		hmacSecret:  hmacSecret,
@@ -59,7 +61,7 @@ func New(port int, databaseUrl string, hmacSecret string) *Controller {
 func (s *Controller) RunMainRuntimeLoop() {
 	// Open a TCP server to the specified localhost and environment variable
 	// specified port number.
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", s.port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("%v:%v", s.ipAddress, s.port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

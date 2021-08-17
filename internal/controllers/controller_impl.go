@@ -3,7 +3,7 @@ package controllers
 import (
 	"context"
 	"errors"
-	// "io"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -13,7 +13,9 @@ import (
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/uuid"
 	"github.com/nakabonne/tstorage"
-	// "google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/bartmika/mothership-server/internal/models"
 	"github.com/bartmika/mothership-server/internal/utils"
@@ -42,7 +44,7 @@ func (s *Controller) Register(ctx context.Context, in *pb.RegistrationReq) (*pb.
 	t := &models.Tenant{
 		Uuid:         uuid.NewString(),
 		Name:         in.Company,
-		State:        1,
+		State:        models.TenantActiveState,
 		Timezone:     in.Timezone,
 		CreatedTime:  time.Now(),
 		ModifiedTime: time.Now(),
@@ -127,6 +129,10 @@ func (s *Controller) Login(ctx context.Context, in *pb.LoginReq) (*pb.LoginRes, 
 	return &pb.LoginRes{AccessToken: accessToken, RefreshToken: refreshToken}, nil
 }
 
+func (s *Controller) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.RefreshTokenRes, error) {
+	return &pb.RefreshTokenRes{}, status.Errorf(codes.Unimplemented, "TODO: implement")
+}
+
 func (s *Controller) InsertTimeSeriesDatum(ctx context.Context, in *pb.TimeSeriesDatumReq) (*empty.Empty, error) {
 	// Get our authenticated user.
 	user := ctx.Value("user").(*models.User)
@@ -154,7 +160,89 @@ func (s *Controller) InsertTimeSeriesDatum(ctx context.Context, in *pb.TimeSerie
 	return &empty.Empty{}, err
 }
 
-func (s *Controller) InsertTimeSeriesData(ctx context.Context, in *pb.TimeSeriesDataListReq) (*empty.Empty, error) {
+// Utility function which will return the `User` stored in our session for the
+// associated `access token` which was provided by the incoming context
+// (which was included by the client when making the `InsertTimeSeriesData`
+// RPC request). In theory this function could be removed and somesort of
+// `ClientSreamInterceptor` be writte instead but for now use this utility
+// function.
+func (s *Controller) getUserFromInsertTimeSeriesDataMiddleware(stream pb.Mothership_InsertTimeSeriesDataServer) (*models.User, error) {
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	md, ok := metadata.FromIncomingContext(ctx) // get context from stream
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "Retrieving metadata is failed")
+    }
+
+	authHeader, ok := md["authorization"]
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "Authorization token is not supplied")
+    }
+
+	token := authHeader[0]
+
+	sessionUuid, err := utils.ProcessBearerToken([]byte(s.hmacSecret), token)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	user, err := s.manager.GetUser(ctx, sessionUuid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	return user, nil
+}
+
+func (s *Controller) InsertTimeSeriesData(stream pb.Mothership_InsertTimeSeriesDataServer) error {
+	// Extract the `User` account associated with the incoming context 'access
+	// token' value sent by the client with this RPC request.
+    user, err := s.getUserFromInsertTimeSeriesDataMiddleware(stream)
+	if err != nil {
+		return err
+	}
+
+	// Lookup the dedicated time-series storage instance for our particular tenant.
+	storage := s.storageMap[user.TenantId]
+
+	// DEVELOPERS NOTE:
+	// If you don't understand how server side streaming works using gRPC then
+	// please visit the documentation to get an understanding:
+	// https://grpc.io/docs/languages/go/basics/#server-side-streaming-rpc-1
+
+	// Wait and receieve the stream from the client.
+	for {
+		datum, err := stream.Recv()
+		if err == io.EOF {
+			return stream.SendAndClose(&empty.Empty{})
+		}
+		if err != nil {
+			return err
+		}
+
+		// Generate our labels, if there are any.
+		labels := []tstorage.Label{}
+		for _, label := range datum.Labels {
+			labels = append(labels, tstorage.Label{Name: label.Name, Value: label.Value})
+		}
+
+		// Generate our datapoint.
+		dataPoint := tstorage.DataPoint{Timestamp: datum.Timestamp.Seconds, Value: datum.Value}
+
+		err = storage.InsertRows([]tstorage.Row{
+			{
+				Metric:    datum.Metric,
+				Labels:    labels,
+				DataPoint: dataPoint,
+			},
+		})
+	}
+
+	return nil
+}
+
+func (s *Controller) InsertBulkTimeSeriesData(ctx context.Context, in *pb.BulkTimeSeriesDataReq) (*empty.Empty, error) {
 	// Get our authenticated user.
 	user := ctx.Value("user").(*models.User)
 
@@ -186,7 +274,7 @@ func (s *Controller) InsertTimeSeriesData(ctx context.Context, in *pb.TimeSeries
 	return &empty.Empty{}, nil
 }
 
-func (s *Controller) SelectTimeSeriesData(ctx context.Context, in *pb.FilterReq) (*pb.SelectRes, error) {
+func (s *Controller) SelectBulkTimeSeriesData(ctx context.Context, in *pb.FilterReq) (*pb.SelectBulkRes, error) {
 	// Get our authenticated user.
 	user := ctx.Value("user").(*models.User)
 
@@ -205,7 +293,7 @@ func (s *Controller) SelectTimeSeriesData(ctx context.Context, in *pb.FilterReq)
 	points, err := storage.Select(in.Metric, labels, in.Start.Seconds, in.End.Seconds)
 	if err != nil {
 		log.Println("SelectTimeSeriesData | storage.Select | err", err)
-		return &pb.SelectRes{DataPoints: results}, nil
+		return &pb.SelectBulkRes{DataPoints: results}, nil
 	}
 
 	for _, point := range points {
@@ -217,5 +305,5 @@ func (s *Controller) SelectTimeSeriesData(ctx context.Context, in *pb.FilterReq)
 		results = append(results, dataPoint)
 	}
 
-	return &pb.SelectRes{DataPoints: results}, nil
+	return &pb.SelectBulkRes{DataPoints: results}, nil
 }

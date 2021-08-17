@@ -1,6 +1,18 @@
 # mothership-server
 The purpose of this application is to provide a gRPC service for storing your internet of things time-series data.
 
+## Motivation
+
+ET (Don't) Phone Home - https://jacquesmattheij.com/et-phone-home/
+
+Google exec says Nest owners should probably warn their guests that their conversations are being recorded - https://www.pulse.ng/bi/tech/google-exec-says-nest-owners-should-probably-warn-their-guests-that-their/z1e1d5n
+
+Google chief: I'd disclose smart speakers before guests enter my home - https://news.ycombinator.com/item?id=21280352
+
+
+
+
+
 ## Installation
 
 Get our latest code.

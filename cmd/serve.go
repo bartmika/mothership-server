@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	// "log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +14,7 @@ import (
 
 func init() {
 	// The following are optional and will have defaults placed when missing.
+	serveCmd.Flags().StringVarP(&ipAddress, "ip", "i", "localhost", "The ip address to bind this server to")
 	serveCmd.Flags().IntVarP(&port, "port", "p", 50051, "The port to run this server on")
 	serveCmd.Flags().StringVarP(&databaseUrl, "database_url", "d", os.Getenv("MOTHERSHIP_SERVER_DATABASE_URL"), "The database URL to run this server on")
 	serveCmd.Flags().StringVarP(&hmacSecret, "hmac_secret", "s", os.Getenv("MOTHERSHIP_SERVER_HMAC_SECRET"), "The secret key to use in this server")
@@ -27,7 +27,7 @@ func doServe() {
 	// Convert the user inputted integer value to be a `time.Duration` type.
 
 	// Setup our server.
-	server := controllers.New(port, databaseUrl, hmacSecret)
+	server := controllers.New(ipAddress, port, databaseUrl, hmacSecret)
 
 	// DEVELOPERS CODE:
 	// The following code will create an anonymous goroutine which will have a

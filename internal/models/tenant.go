@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+var (
+	TenantActiveState   int8 = 1
+	TenantInactiveState int8 = 0
+)
+
 type Tenant struct {
 	Id           uint64    `json:"id"`
 	Uuid         string    `json:"uuid"`
