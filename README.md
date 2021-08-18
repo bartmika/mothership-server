@@ -9,10 +9,6 @@ Google exec says Nest owners should probably warn their guests that their conver
 
 Google chief: I'd disclose smart speakers before guests enter my home - https://news.ycombinator.com/item?id=21280352
 
-
-
-
-
 ## Installation
 
 Get our latest code.
