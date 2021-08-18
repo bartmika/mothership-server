@@ -74,7 +74,7 @@ func (s *Controller) Register(ctx context.Context, in *pb.RegistrationReq) (*pb.
 		ModifiedTime:      time.Now(),
 		PasswordHash:      passwordHash,
 		PasswordAlgorithm: "bcrypt",
-		RoleId:            models.UserAdminRoleId,
+		RoleId:            models.UserTenantAdminRoleId,
 	}
 	err = s.userRepo.Insert(ctx, u)
 	if err != nil {
