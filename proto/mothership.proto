@@ -61,7 +61,7 @@ message DataPointRes {
     google.protobuf.Timestamp timestamp = 4;
 }
 
-message Label {
+message LabelReq {
     string name = 1;
     string value = 2;
 }
@@ -72,14 +72,14 @@ message BulkTimeSeriesDataReq {
 
 message TimeSeriesDatumReq {
     string metric = 1;
-    repeated Label labels = 2;
+    repeated LabelReq labels = 2;
     double value = 3;
     google.protobuf.Timestamp timestamp = 4;
 }
 
 message FilterReq {
     string metric = 1;
-    repeated Label labels = 2;
+    repeated LabelReq labels = 2;
     google.protobuf.Timestamp start = 3;
     google.protobuf.Timestamp end = 4;
 }

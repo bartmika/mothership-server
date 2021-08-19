@@ -9,6 +9,10 @@ Google exec says Nest owners should probably warn their guests that their conver
 
 Google chief: I'd disclose smart speakers before guests enter my home - https://news.ycombinator.com/item?id=21280352
 
+Keep Your Internet Off My Things - https://medium.com/@downey_78309/keep-your-internet-off-my-things-7e35761b66d7
+
+In 2030, You Won't Own Any Gadgets - https://gizmodo.com/in-2030-you-wont-own-any-gadgets-1847176540
+
 ## Installation
 
 Get our latest code.
